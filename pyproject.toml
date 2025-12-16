@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hwmon"
+version = "1.0.0"
+description = "Minimal real-time CPU/GPU hardware monitor for Windows"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "hwmon contributors"}
+]
+keywords = ["hardware", "monitor", "cpu", "gpu", "temperature", "performance"]
+classifiers = [
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Monitoring",
+]
+
+# No external dependencies - uses only Python standard library (tkinter, ctypes)
+dependencies = []
+
+[project.scripts]
+hwmon = "hwmon.main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+    "uv",
+]
+build = [
+    "pyinstaller>=6.0",
+]
