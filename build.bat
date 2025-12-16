@@ -29,6 +29,3 @@ echo.
 echo Executable location: dist\hwmon.exe
 echo File size: 
 dir dist\hwmon.exe | find "hwmon.exe"
-echo.
-echo You can now run: dist\hwmon.exe
-echo.
