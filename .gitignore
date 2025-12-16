@@ -166,5 +166,6 @@ tmp-build
 tmp-schema.yml
 .build-cache
 .artifacts
+.venv-build
 
 !hwmon.spec

@@ -1,25 +1,45 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec file for HW Monitor."""
 
-block_cipher = None
+from PyInstaller.utils.hooks import collect_submodules
+
+hwmon_modules = collect_submodules('hwmon')
+
+excludes = [
+    # Network/crypto
+    'ssl', '_ssl', 'hashlib', '_hashlib',
+    'email', 'http', 'urllib', 'ftplib', 'smtplib', 'imaplib', 'poplib',
+    'xmlrpc', 'html', 'xml',
+    # Testing/debugging
+    'unittest', 'pytest', 'doctest', 'pdb', 'profile', 'cProfile',
+    # Unused stdlib
+    'sqlite3', 'asyncio', 'concurrent', 'multiprocessing',
+    'logging', 'argparse', 'getopt', 'optparse',
+    'pydoc', 'tarfile', 'gzip',
+    'csv', 'configparser', 'json',  # if not using these
+    'decimal', 'fractions', 'statistics',
+    'calendar', 'gettext', 'locale',
+    # Platform-specific
+    'curses', 'readline', 'rlcompleter',
+    # Tkinter extras
+    'tkinter.tix', 'tkinter.scrolledtext',
+]
 
 a = Analysis(
     ['hwmon/main.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=hwmon_modules,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
+    excludes=excludes,
     noarchive=False,
+    optimize=2,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 
 exe = EXE(
     pyz,
@@ -35,12 +55,11 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # No console window
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # Add icon='icon.ico' if you have an icon file
+    icon=None,
 )
-

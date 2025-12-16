@@ -14,6 +14,9 @@ jobs:
 
       - uses: astral-sh/setup-uv@v4
 
+      - name: Install UPX
+        run: choco install upx -y
+
       - name: Get version
         id: version
         run: |
@@ -21,7 +24,7 @@ jobs:
           echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
 
       - name: Build exe
-        run: uv run --group build pyinstaller --clean hwmon.spec
+        run: uv run --only-group build pyinstaller --clean hwmon.spec
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2
