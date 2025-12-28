@@ -1,4 +1,5 @@
 import ctypes
+from ctypes import _Pointer
 import ctypes.wintypes as wintypes
 
 
@@ -111,19 +112,17 @@ class PDHQuery:
             return None
         return fmt.doubleValue
 
-    def get_array(self, key: str) -> list[tuple[str, float | None]]:
+    def _get_base_array(self, key: str) -> tuple[int, _Pointer[PDH_FMT_COUNTERVALUE_ITEM_DOUBLE] | None]:
         counter = self._counters.get(key)
         if not counter:
-            return []
+            return 0, None
 
         buf_size = wintypes.DWORD(0)
         item_count = wintypes.DWORD(0)
         status = PDH["PdhGetFormattedCounterArray"](counter, PDH_FMT_DOUBLE, ctypes.byref(buf_size), ctypes.byref(item_count), None)
 
         if status != PDH_MORE_DATA:
-            if status == ERROR_SUCCESS:
-                return []
-            return []
+            return 0, None
 
         buffer = (ctypes.c_byte * buf_size.value)()
         status = PDH["PdhGetFormattedCounterArray"](
@@ -134,15 +133,35 @@ class PDHQuery:
             ctypes.cast(buffer, ctypes.c_void_p),
         )
         if status != ERROR_SUCCESS:
-            return []
+            return 0, None
 
         array_ptr = ctypes.cast(buffer, ctypes.POINTER(PDH_FMT_COUNTERVALUE_ITEM_DOUBLE))
-        readings: list[tuple[str, float | None]] = []
-        for idx in range(item_count.value):
+        return item_count.value, array_ptr
+
+    def get_array(self, key: str) -> list[float | None]:
+        item_count, array_ptr = self._get_base_array(key)
+        if item_count == 0:
+            return []
+
+        readings: list[float | None] = []
+        for idx in range(item_count):
             item = array_ptr[idx]
             if item.FmtValue.CStatus == ERROR_SUCCESS:
-                readings.append((item.szName, item.FmtValue.doubleValue))
+                readings.append(item.FmtValue.doubleValue)
             else:
-                readings.append((item.szName, None))
+                readings.append(None)
         return readings
 
+    def get_dict(self, key: str) -> dict[str, float | None]:
+        item_count, array_ptr = self._get_base_array(key)
+        if item_count == 0:
+            return {}
+
+        readings: dict[str, float | None] = {}
+        for idx in range(item_count):
+            item = array_ptr[idx]
+            readings[item.szName.lower()] = (
+                item.FmtValue.doubleValue if item.FmtValue.CStatus == ERROR_SUCCESS else None
+            )
+
+        return readings

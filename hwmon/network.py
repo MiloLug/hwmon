@@ -8,11 +8,6 @@ class NetworkBackend:
         self._query = PDHQuery()
         self._query.add_counter("bytes_recv", r"\Network Interface(*)\Bytes Received/sec")
         self._query.add_counter("bytes_sent", r"\Network Interface(*)\Bytes Sent/sec")
-        
-        # Initialize with first collection
-        if self._query.collect():
-            time.sleep(0.1)
-            self._query.collect()
     
     def sample(self) -> dict[str, float | None]:
         """Collect current network readings (bytes per second)."""

@@ -61,22 +61,19 @@ class SensorBackend:
         return sum(val for _, val in temps) / len(temps)
 
     def _gpu_usage(self) -> float | None:
-        readings = self._query.get_array("gpu_usage")
+        readings = self._query.get_dict("gpu_usage")
         values = []
         if not self._gpu_usage_names:
-            for name, value in readings:
+            for name, value in readings.items():
                 if value is None:
                     continue
-                label = (name or "").lower()
-                if "engtype_3d" in label or "engtype_compute" in label or "engtype_copy" in label or "_total" in label:
+                if "engtype_3d" in name or "engtype_compute" in name or "engtype_copy" in name or "_total" in name:
                     values.append(value)
                     self._gpu_usage_names.add(name)
         else:
-            for name, value in readings:
-                if value is not None and name in self._gpu_usage_names:
+            for name in self._gpu_usage_names:
+                if (value := readings.get(name)) is not None:
                     values.append(value)
-        if not values:
-            values = [value for _, value in readings if value is not None]
         if not values:
             return None
         total = sum(values)
