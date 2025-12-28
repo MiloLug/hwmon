@@ -140,7 +140,7 @@ class PDHQuery:
 
     def get_array(self, key: str) -> list[float | None]:
         item_count, array_ptr = self._get_base_array(key)
-        if item_count == 0:
+        if item_count == 0 or array_ptr is None:
             return []
 
         readings: list[float | None] = []
@@ -154,7 +154,7 @@ class PDHQuery:
 
     def get_dict(self, key: str) -> dict[str, float | None]:
         item_count, array_ptr = self._get_base_array(key)
-        if item_count == 0:
+        if item_count == 0 or array_ptr is None:
             return {}
 
         readings: dict[str, float | None] = {}

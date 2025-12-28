@@ -1,6 +1,4 @@
 import ctypes
-import ctypes.wintypes as wintypes
-from typing import NamedTuple
 
 
 # ADL Constants
@@ -60,9 +58,14 @@ class ADLPMActivity(ctypes.Structure):
 ADL_Main_Memory_Alloc = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_int)
 
 @ADL_Main_Memory_Alloc
-def adl_malloc(size: int) -> int:
+def adl_malloc(size: int) -> int | None:
     """Allocate memory for ADL."""
     return ctypes.cast(ctypes.create_string_buffer(size), ctypes.c_void_p).value
+
+
+class ADLGPUInitError(Exception):
+    """Error initializing ADL."""
+    pass
 
 
 class ADLGPUMonitor:
@@ -72,9 +75,6 @@ class ADLGPUMonitor:
         self._adl_available = False
         self._adapter_count = 0
         self._adapter_indices: list[int] = []
-        self._adl_main_control_destroy = None
-        self._adl_overdrive5_temperature_get = None
-        self._adl_overdrive5_currentactivity_get = None
         
         try:
             # Try to load 64-bit ADL library first
@@ -153,7 +153,7 @@ class ADLGPUMonitor:
                 self._adl_available = True
                 
         except Exception:
-            pass
+            raise ADLGPUInitError("Failed to initialize ADL")
     
     def get_temperatures(self) -> list[float]:
         """Returns list of GPU temperatures in Celsius."""

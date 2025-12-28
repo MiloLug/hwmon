@@ -29,7 +29,7 @@ class BaseComponent(ABC):
         self._color = style.color or self.TEXT_COLOR
         self._width = style.width
         
-        self._frame = tk.Frame(parent, bg=self.BG_COLOR, width=style.width)
+        self._frame = tk.Frame(parent, bg=self.BG_COLOR, width=style.width or 0)
         self._widgets: list[tk.Widget] = [self._frame]
         
         self._build_ui()
@@ -42,6 +42,11 @@ class BaseComponent(ABC):
     @abstractmethod
     def _update(self) -> None:
         """Update the component display."""
+        pass
+
+    @abstractmethod
+    def update(self) -> bool:
+        """Update the component. Returns True if display was refreshed."""
         pass
     
     def pack(self, **kwargs) -> None:
@@ -121,8 +126,6 @@ class GraphComponent(SampledComponent):
         self._widgets.append(self._canvas)
     
     def _update(self) -> None:
-        value = self._history[-1] if self._history else None
-        self._value_label.configure(text=f"{value:.1f}" if value is not None else "N/A")
         self._draw_graph()
     
     def _draw_graph(self) -> None:

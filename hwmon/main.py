@@ -5,7 +5,7 @@ import tkinter as tk
 from dataclasses import replace
 
 from hwmon.components import (
-    CPUComponent, GPUComponent, LoadTempGraphComponent, NetworkComponent,
+    BaseComponent, CPUComponent, GPUComponent, LoadTempGraphComponent, NetworkComponent,
 )
 from hwmon.network import NetworkBackend
 from hwmon.sensors import SensorBackend
@@ -56,7 +56,7 @@ class MonitorApp:
         self._gpu = GPUComponent(container, replace(graph_style, graph_color="#4aff9e"))
         self._network = NetworkComponent(container, NetworkComponent.Style(width=self.WIDTH, sample_window=update_measures))
         
-        self._components = [self._cpu, self._gpu, self._network]
+        self._components: list[BaseComponent] = [self._cpu, self._gpu, self._network]
         
         # Pack components
         for component in self._components:
@@ -71,7 +71,7 @@ class MonitorApp:
         
         self._create_context_menu()
     
-    def _bind_drag_events(self, widget: tk.Widget) -> None:
+    def _bind_drag_events(self, widget: tk.Misc) -> None:
         """Bind mouse drag events to a widget."""
         widget.bind("<Button-1>", self._start_drag)
         widget.bind("<B1-Motion>", self._on_drag)

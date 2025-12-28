@@ -1,8 +1,8 @@
 from math import nan
-from typing import Iterable, Sequence
+from typing import Sequence
 
 
-def mean(values: Iterable[float | None]) -> float:
+def mean(values: Sequence[float]) -> float:
     if not values:
         return nan
     return sum(values) / len(values)

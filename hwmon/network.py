@@ -1,4 +1,3 @@
-import time
 
 from hwmon.pdh_counters import PDHQuery
 
@@ -19,11 +18,11 @@ class NetworkBackend:
     
     def _get_total_bytes(self, key: str) -> float | None:
         """Sum bytes across all network interfaces, excluding loopback."""
-        readings = self._query.get_array(key)
+        readings = self._query.get_dict(key)
         total = 0.0
         count = 0
         
-        for name, value in readings:
+        for name, value in readings.items():
             if value is None:
                 continue
             label = (name or "").lower()
