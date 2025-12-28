@@ -68,6 +68,8 @@ class ADLGPUInitError(Exception):
     pass
 
 
+# Tbh I can't test this, don't have any AMDs, so I just asked AI to write this part...
+
 class ADLGPUMonitor:
     """Reads AMD GPU temperatures and metrics using ADL."""
     
