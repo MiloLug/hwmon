@@ -1,15 +1,9 @@
-"""Network sensor backend for monitoring network traffic."""
-
-from __future__ import annotations
-
 import time
 
 from hwmon.pdh_counters import PDHQuery
 
 
 class NetworkBackend:
-    """Backend for reading network traffic metrics via PDH counters."""
-    
     def __init__(self) -> None:
         self._query = PDHQuery()
         self._query.add_counter("bytes_recv", r"\Network Interface(*)\Bytes Received/sec")

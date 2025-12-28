@@ -1,7 +1,3 @@
-"""Windows Performance Data Helper (PDH) counter wrapper using only ctypes."""
-
-from __future__ import annotations
-
 import ctypes
 import ctypes.wintypes as wintypes
 
@@ -36,7 +32,7 @@ class PDH_FMT_COUNTERVALUE_ITEM_DOUBLE(ctypes.Structure):
 pdh = ctypes.windll.pdh
 
 
-def _set_proto():
+def _init_pdh_functions():
     PdhOpenQuery = pdh.PdhOpenQueryW
     PdhOpenQuery.argtypes = [wintypes.LPCWSTR, ctypes.c_void_p, ctypes.POINTER(wintypes.HANDLE)]
     PdhOpenQuery.restype = wintypes.DWORD
@@ -80,7 +76,7 @@ def _set_proto():
     }
 
 
-PDH = _set_proto()
+PDH = _init_pdh_functions()
 
 
 class PDHQuery:

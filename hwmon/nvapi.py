@@ -1,7 +1,3 @@
-"""NVIDIA GPU monitoring via NVAPI using only ctypes (no external dependencies)."""
-
-from __future__ import annotations
-
 import ctypes
 import ctypes.wintypes as wintypes
 
@@ -29,8 +25,6 @@ class NV_GPU_THERMAL_SETTINGS(ctypes.Structure):
 
 
 class NVAPIGPUMonitor:
-    """Reads NVIDIA GPU temperatures using NVAPI."""
-    
     def __init__(self) -> None:
         self._gpu_handles = None
         self._gpu_count = 0

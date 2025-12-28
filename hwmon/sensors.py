@@ -1,7 +1,3 @@
-"""Hardware sensor backend for monitoring CPU and GPU metrics."""
-
-from __future__ import annotations
-
 import time
 
 from hwmon.amdadl import ADLGPUMonitor
