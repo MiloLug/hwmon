@@ -1,14 +1,3 @@
-"""Minimal real-time CPU/GPU monitor with visual graphs.
-
-This implementation targets Windows 10+ and relies on the native Performance
-Data Helper (PDH) APIs and NVAPI exposed through `ctypes` to gather CPU load,
-thermal zone temperatures, and GPU metrics. Pure Python implementation with no
-external dependencies beyond tkinter.
-
-GPU temperature is read via NVAPI for NVIDIA GPUs. Other metrics fall back to
-PDH counters when available. Values display "N/A" when unavailable.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -16,8 +5,7 @@ import tkinter as tk
 from dataclasses import replace
 
 from hwmon.components import (
-    CPUComponent, GPUComponent, NetworkComponent,
-    LoadTempGraphStyle, NetworkStyle,
+    BaseComponent, CPUComponent, GPUComponent, LoadTempGraphComponent, NetworkComponent,
 )
 from hwmon.network import NetworkBackend
 from hwmon.sensors import SensorBackend
@@ -58,7 +46,7 @@ class MonitorApp:
         container.pack(fill="both", expand=True)
 
         # Create components with shared style base
-        graph_style = LoadTempGraphStyle(
+        graph_style = LoadTempGraphComponent.Style(
             width=self.WIDTH,
             sample_window=update_measures,
             temp_threshold=80.0,
@@ -66,9 +54,9 @@ class MonitorApp:
         
         self._cpu = CPUComponent(container, replace(graph_style, graph_color="#4a9eff"))
         self._gpu = GPUComponent(container, replace(graph_style, graph_color="#4aff9e"))
-        self._network = NetworkComponent(container, NetworkStyle(width=self.WIDTH, sample_window=update_measures))
+        self._network = NetworkComponent(container, NetworkComponent.Style(width=self.WIDTH, sample_window=update_measures))
         
-        self._components = [self._cpu, self._gpu, self._network]
+        self._components: list[BaseComponent] = [self._cpu, self._gpu, self._network]
         
         # Pack components
         for component in self._components:
@@ -83,7 +71,7 @@ class MonitorApp:
         
         self._create_context_menu()
     
-    def _bind_drag_events(self, widget: tk.Widget) -> None:
+    def _bind_drag_events(self, widget: tk.Misc) -> None:
         """Bind mouse drag events to a widget."""
         widget.bind("<Button-1>", self._start_drag)
         widget.bind("<B1-Motion>", self._on_drag)

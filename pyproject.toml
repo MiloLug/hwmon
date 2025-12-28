@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hwmon"
-version = "1.0.1"
+version = "1.1.0"
 description = "Minimal real-time CPU/GPU hardware monitor for Windows"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -25,7 +25,10 @@ hwmon = "hwmon.main:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
     "pytest>=9.0.0",
+    "ruff>=0.14.10",
     "uv",
 ]
 build = [

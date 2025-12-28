@@ -1,7 +1,3 @@
-"""NVIDIA GPU monitoring via NVAPI using only ctypes (no external dependencies)."""
-
-from __future__ import annotations
-
 import ctypes
 import ctypes.wintypes as wintypes
 
@@ -28,14 +24,14 @@ class NV_GPU_THERMAL_SETTINGS(ctypes.Structure):
     ]
 
 
+class NVAPIInitError(Exception):
+    """Error initializing NVAPI."""
+    pass
+
 class NVAPIGPUMonitor:
-    """Reads NVIDIA GPU temperatures using NVAPI."""
-    
     def __init__(self) -> None:
-        self._gpu_handles = None
         self._gpu_count = 0
         self._nvapi_available = False
-        self._get_thermal = None
         
         try:
             nvapi = ctypes.CDLL("nvapi64.dll")
@@ -70,8 +66,11 @@ class NVAPIGPUMonitor:
                     self._gpu_handles = gpu_handles
                     self._gpu_count = gpu_count.value
                     self._nvapi_available = True
-        except Exception:
-            pass
+            else:
+                raise NVAPIInitError("nvapi_init() returned non-zero")
+
+        except Exception as e:
+            raise NVAPIInitError("Failed to initialize NVAPI") from e
     
     def get_temperatures(self) -> list[float]:
         """Returns list of GPU temperatures in Celsius."""

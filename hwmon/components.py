@@ -10,61 +10,26 @@ from dataclasses import dataclass
 from hwmon.utils import mean
 
 
-# =============================================================================
-# Style dataclasses
-# =============================================================================
-
-@dataclass
-class BaseStyle:
-    """Base style for all components."""
-    color: str | None = None
-    width: int | None = None
-
-
-@dataclass
-class SampledStyle(BaseStyle):
-    """Style for sampled components."""
-    history_len: int = 60
-    sample_window: int = 4
-
-
-@dataclass
-class GraphStyle(SampledStyle):
-    """Style for graph components."""
-    max_value: float = 100.0
-    graph_color: str | None = None
-
-
-@dataclass
-class LoadTempGraphStyle(GraphStyle):
-    """Style for load/temp graph components."""
-    temp_threshold: float | None = None
-
-
-@dataclass
-class NetworkStyle(BaseStyle):
-    """Style for network component."""
-    sample_window: int = 4
-
-
-# =============================================================================
-# Components
-# =============================================================================
-
 class BaseComponent(ABC):
     """Base class for monitor UI components."""
+    
+    @dataclass
+    class Style:
+        """Base style for all components."""
+        color: str | None = None
+        width: int | None = None
     
     BG_COLOR = "#1e1e1e"
     TEXT_COLOR = "#e0e0e0"
     TEXT_COLOR_DIM = "#888888"
     FONT = ("Segoe UI", 11)
     
-    def __init__(self, parent: tk.Widget, style: BaseStyle) -> None:
+    def __init__(self, parent: tk.Widget, style: Style) -> None:
         self._parent = parent
         self._color = style.color or self.TEXT_COLOR
         self._width = style.width
         
-        self._frame = tk.Frame(parent, bg=self.BG_COLOR, width=style.width)
+        self._frame = tk.Frame(parent, bg=self.BG_COLOR, width=style.width or 0)
         self._widgets: list[tk.Widget] = [self._frame]
         
         self._build_ui()
@@ -77,6 +42,11 @@ class BaseComponent(ABC):
     @abstractmethod
     def _update(self) -> None:
         """Update the component display."""
+        pass
+
+    @abstractmethod
+    def update(self) -> bool:
+        """Update the component. Returns True if display was refreshed."""
         pass
     
     def pack(self, **kwargs) -> None:
@@ -91,7 +61,13 @@ class BaseComponent(ABC):
 class SampledComponent(BaseComponent):
     """Component with sample averaging and history tracking."""
     
-    def __init__(self, parent: tk.Widget, label_text: str, style: SampledStyle) -> None:
+    @dataclass
+    class Style(BaseComponent.Style):
+        """Style for sampled components."""
+        history_len: int = 60
+        sample_window: int = 4
+    
+    def __init__(self, parent: tk.Widget, label_text: str, style: Style) -> None:
         self._label_text = label_text
         self._history: deque[float] = deque([0.0] * style.history_len, maxlen=style.history_len)
         self._samples: deque[float] = deque([0.0], maxlen=style.sample_window)
@@ -119,10 +95,16 @@ class SampledComponent(BaseComponent):
 class GraphComponent(SampledComponent):
     """Generic component with a line graph visualization."""
     
+    @dataclass
+    class Style(SampledComponent.Style):
+        """Style for graph components."""
+        max_value: float = 100.0
+        graph_color: str | None = None
+    
     GRAPH_HEIGHT = 20
     GRAPH_BG = "#2a2a2a"
     
-    def __init__(self, parent: tk.Widget, label_text: str, style: GraphStyle) -> None:
+    def __init__(self, parent: tk.Widget, label_text: str, style: Style) -> None:
         self._max_value = style.max_value
         self._graph_color = style.graph_color or self.TEXT_COLOR
         super().__init__(parent, label_text, style)
@@ -144,8 +126,6 @@ class GraphComponent(SampledComponent):
         self._widgets.append(self._canvas)
     
     def _update(self) -> None:
-        value = self._history[-1] if self._history else None
-        self._value_label.configure(text=f"{value:.1f}" if value is not None else "N/A")
         self._draw_graph()
     
     def _draw_graph(self) -> None:
@@ -178,9 +158,14 @@ class GraphComponent(SampledComponent):
 class LoadTempGraphComponent(GraphComponent):
     """Graph component with temperature and usage display."""
     
+    @dataclass
+    class Style(GraphComponent.Style):
+        """Style for load/temp graph components."""
+        temp_threshold: float | None = None
+    
     WARN_COLOR = "#ff4444"
     
-    def __init__(self, parent: tk.Widget, label_text: str, style: LoadTempGraphStyle) -> None:
+    def __init__(self, parent: tk.Widget, label_text: str, style: Style) -> None:
         self._temp_threshold = style.temp_threshold
         self._usage_samples: deque[float] = deque([0.0], maxlen=style.sample_window)
         super().__init__(parent, label_text, style)
@@ -289,11 +274,16 @@ class LoadTempGraphComponent(GraphComponent):
 class NetworkComponent(BaseComponent):
     """Component showing network in/out on a single row with arrows."""
     
+    @dataclass
+    class Style(BaseComponent.Style):
+        """Style for network component."""
+        sample_window: int = 4
+    
     DOWN_COLOR = "#8b5cf6"  # Purple for download
     UP_COLOR = "#eab308"    # Yellow for upload
     
-    def __init__(self, parent: tk.Widget, style: NetworkStyle | None = None) -> None:
-        style = style or NetworkStyle()
+    def __init__(self, parent: tk.Widget, style: Style | None = None) -> None:
+        style = style or NetworkComponent.Style()
         self._sample_window = style.sample_window
         self._in_samples: deque[float] = deque([0.0], maxlen=style.sample_window)
         self._out_samples: deque[float] = deque([0.0], maxlen=style.sample_window)
@@ -356,9 +346,9 @@ class NetworkComponent(BaseComponent):
 class CPUComponent(LoadTempGraphComponent):
     """CPU temperature and usage component."""
     
-    DEFAULT_STYLE = LoadTempGraphStyle(graph_color="#4a9eff")
+    DEFAULT_STYLE = LoadTempGraphComponent.Style(graph_color="#4a9eff")
     
-    def __init__(self, parent: tk.Widget, style: LoadTempGraphStyle | None = None) -> None:
+    def __init__(self, parent: tk.Widget, style: LoadTempGraphComponent.Style | None = None) -> None:
         style = style or self.DEFAULT_STYLE
         super().__init__(parent, "CPU", style)
 
@@ -366,9 +356,9 @@ class CPUComponent(LoadTempGraphComponent):
 class GPUComponent(LoadTempGraphComponent):
     """GPU temperature and usage component."""
     
-    DEFAULT_STYLE = LoadTempGraphStyle(graph_color="#4aff9e")
+    DEFAULT_STYLE = LoadTempGraphComponent.Style(graph_color="#4aff9e")
     
-    def __init__(self, parent: tk.Widget, style: LoadTempGraphStyle | None = None) -> None:
+    def __init__(self, parent: tk.Widget, style: LoadTempGraphComponent.Style | None = None) -> None:
         style = style or self.DEFAULT_STYLE
         super().__init__(parent, "GPU", style)
 
@@ -382,4 +372,3 @@ def _format_speed(bytes_per_sec: float | None) -> str:
     elif bytes_per_sec >= 1024:
         return f"{bytes_per_sec / 1024:.1f} KB"
     return f"{int(bytes_per_sec)} B"
-
