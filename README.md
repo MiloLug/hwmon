@@ -1,20 +1,36 @@
 # HW Monitor
 
-Minimal hardware monitor for Windows. CPU/GPU temps and usage. No dependencies.
+Minimal always-on-top hardware monitor for Windows. Pure Python, zero dependencies.
+
+![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue)
+![Windows](https://img.shields.io/badge/platform-windows-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+![Screenshot1](assets/screenshot1.png)
+
+## Features
+
+- CPU temperature & usage
+- GPU temperature & usage (NVIDIA, AMD, Intel)
+- Network throughput (in/out)
+- Borderless, always-on-top overlay
 
 ## Install
 
-**Executable**: Download `hwmon.exe` from releases, run it.
+**Executable**: Get `hwmon.exe` from releases, just run it.
 
 **From source**:
 ```bash
-python -m hwmon
+uv run hwmon
 ```
 
 **Build yourself**:
+
+You'll need python 3.13 with UV
 ```bash
-pip install pyinstaller
-build.bat
+.\build.bat
+# or
+uv run pyinstaller hwmon.spec
 ```
 
 ## Controls
@@ -22,19 +38,16 @@ build.bat
 - Drag anywhere to move
 - Right-click to exit
 
-## Requirements
+## GPU Support
 
-- Windows 10+
-- NVIDIA drivers for GPU temp (AMD/Intel may show N/A)
+| Vendor | Temp | Usage | Method |
+|--------|------|-------|--------|
+| NVIDIA | ✓ | ✓ | NVAPI + PDH |
+| AMD | ? | ? | ADL + PDH |
+| Intel | ~ | ✓ | PDH only |
 
-## Structure
-
-| File | Purpose |
-|------|---------|
-| `main.py` | GUI (tkinter) |
-| `sensors.py` | Sensor backend |
-| `pdh_counters.py` | Windows PDH API |
-| `nvapi.py` | NVIDIA API |
+- Intel iGPU temp depends on thermal zone exposure. May show N/A.
+- AMD not tested
 
 ## License
 
