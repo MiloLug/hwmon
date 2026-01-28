@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from datetime import datetime
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass
@@ -16,20 +17,19 @@ class BaseComponent(ABC):
     @dataclass
     class Style:
         """Base style for all components."""
-        color: str | None = None
+        color: str = "#e0e0e0"
         width: int | None = None
-    
-    BG_COLOR = "#1e1e1e"
-    TEXT_COLOR = "#e0e0e0"
-    TEXT_COLOR_DIM = "#888888"
-    FONT = ("Segoe UI", 11)
+        font: tuple[str, int] = ("Segoe UI", 11)
+        bg_color: str = "#1e1e1e"
     
     def __init__(self, parent: tk.Widget, style: Style) -> None:
         self._parent = parent
-        self._color = style.color or self.TEXT_COLOR
+        self._color = style.color
+        self._bg_color = style.bg_color
         self._width = style.width
-        
-        self._frame = tk.Frame(parent, bg=self.BG_COLOR, width=style.width or 0)
+        self._font = style.font
+
+        self._frame = tk.Frame(parent, bg=self._bg_color, width=style.width or 0)
         self._widgets: list[tk.Widget] = [self._frame]
         
         self._build_ui()
@@ -114,7 +114,7 @@ class GraphComponent(SampledComponent):
     
     def __init__(self, parent: tk.Widget, label_text: str, style: Style) -> None:
         self._max_value = style.max_value
-        self._graph_color = style.graph_color or self.TEXT_COLOR
+        self._graph_color = style.graph_color or self._color
         super().__init__(parent, label_text, style)
     
     def _build_ui(self) -> None:
@@ -170,38 +170,38 @@ class LoadTempGraphComponent(GraphComponent):
     class Style(GraphComponent.Style):
         """Style for load/temp graph components."""
         temp_threshold: float | None = None
-    
-    WARN_COLOR = "#ff4444"
+        warn_color: str = "#ff4444"
     
     def __init__(self, parent: tk.Widget, label_text: str, style: Style) -> None:
         self._temp_threshold = style.temp_threshold
+        self._warn_color = style.warn_color
         self._usage_samples: deque[float] = deque([0.0], maxlen=style.sample_window)
         super().__init__(parent, label_text, style)
     
     def _build_ui(self) -> None:
         # Label row
-        label_row = tk.Frame(self._frame, bg=self.BG_COLOR)
+        label_row = tk.Frame(self._frame, bg=self._bg_color)
         label_row.pack(fill="x", padx=10)
         
         self._name_label = tk.Label(
             label_row,
             text=f"{self._label_text}:",
-            font=self.FONT,
-            bg=self.BG_COLOR,
+            font=self._font,
+            bg=self._bg_color,
             fg=self._color,
             anchor="w",
         )
         self._name_label.pack(side="left")
         
         # Right side container for temp and usage
-        right_frame = tk.Frame(label_row, bg=self.BG_COLOR)
+        right_frame = tk.Frame(label_row, bg=self._bg_color)
         right_frame.pack(side="right")
         
         self._temp_label = tk.Label(
             right_frame,
             text="--",
-            font=self.FONT,
-            bg=self.BG_COLOR,
+            font=self._font,
+            bg=self._bg_color,
             fg=self._color,
             anchor="e",
             width=7,
@@ -211,8 +211,8 @@ class LoadTempGraphComponent(GraphComponent):
         self._usage_label = tk.Label(
             right_frame,
             text="--",
-            font=self.FONT,
-            bg=self.BG_COLOR,
+            font=self._font,
+            bg=self._bg_color,
             fg=self._color,
             anchor="e",
             width=6,
@@ -264,7 +264,7 @@ class LoadTempGraphComponent(GraphComponent):
         # Use warn color if temp exceeds threshold
         temp = self._history[-1] if self._history else None
         if self._temp_threshold and temp and temp > self._temp_threshold:
-            graph_color = self.WARN_COLOR
+            graph_color = self._warn_color
         else:
             graph_color = self._graph_color
         
@@ -279,6 +279,40 @@ class LoadTempGraphComponent(GraphComponent):
             self._usage_samples.append(usage)
 
 
+class TimeComponent(BaseComponent):
+    """Component showing current time and date."""
+
+    @dataclass
+    class Style(BaseComponent.Style):
+        """Style for time component."""
+
+    def __init__(self, parent: tk.Widget, style: Style | None = None) -> None:
+        self._last_text: str | None = None
+        super().__init__(parent, style or TimeComponent.Style())
+
+    def _build_ui(self) -> None:
+        self._label = tk.Label(
+            self._frame,
+            text="--:-- --.--",
+            font=self._font,
+            bg=self._bg_color,
+            fg=self._color,
+            anchor="center",
+        )
+        self._label.pack(fill="x", pady=0)
+        self._widgets.append(self._label)
+
+    def _update(self) -> None:
+        text = datetime.now().strftime("%H:%M %d.%m")
+        if text != self._last_text:
+            self._label.configure(text=text)
+            self._last_text = text
+
+    def update(self) -> bool:
+        self._update()
+        return True
+
+
 class NetworkComponent(BaseComponent):
     """Component showing network in/out on a single row with arrows."""
     
@@ -286,9 +320,8 @@ class NetworkComponent(BaseComponent):
     class Style(BaseComponent.Style):
         """Style for network component."""
         sample_window: int = 4
-    
-    DOWN_COLOR = "#8b5cf6"  # Purple for download
-    UP_COLOR = "#eab308"    # Yellow for upload
+        down_color: str = "#8b5cf6"  # Upload color
+        up_color: str = "#eab308"    # Download color
     
     def __init__(self, parent: tk.Widget, style: Style | None = None) -> None:
         style = style or NetworkComponent.Style()
@@ -298,19 +331,21 @@ class NetworkComponent(BaseComponent):
         self._sample_count = 0
         self._current_in: float = 0.0
         self._current_out: float = 0.0
+        self._down_color = style.down_color
+        self._up_color = style.up_color
         super().__init__(parent, style)
     
     def _build_ui(self) -> None:
-        row = tk.Frame(self._frame, bg=self.BG_COLOR)
+        row = tk.Frame(self._frame, bg=self._bg_color)
         row.pack(fill="x", padx=10, pady=2)
         
         # Down arrow and value
         self._down_label = tk.Label(
             row,
             text="↓ --",
-            font=self.FONT,
-            bg=self.BG_COLOR,
-            fg=self.DOWN_COLOR,
+            font=self._font,
+            bg=self._bg_color,
+            fg=self._down_color,
             anchor="w",
         )
         self._down_label.pack(side="left")
@@ -319,9 +354,9 @@ class NetworkComponent(BaseComponent):
         self._up_label = tk.Label(
             row,
             text="↑ --",
-            font=self.FONT,
-            bg=self.BG_COLOR,
-            fg=self.UP_COLOR,
+            font=self._font,
+            bg=self._bg_color,
+            fg=self._up_color,
             anchor="e",
         )
         self._up_label.pack(side="right")
