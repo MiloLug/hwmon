@@ -67,7 +67,7 @@ class MonitorApp:
         self._window.root.bind("<<WindowSnapChanged>>", self._on_snap_changed)
 
         self._minimized = False
-        self._restore_geometry: tuple[int, int, int, int] | None = None
+        self._restore_size: tuple[int, int] | None = None
         self._bar_visible = False
         self._bar = tk.Frame(container, bg="#2b2b2b", height=8)
         self._bar.pack_forget()
@@ -148,7 +148,7 @@ class MonitorApp:
         h = self._window.root.winfo_height()
         x = self._window.root.winfo_x()
         y = self._window.root.winfo_y()
-        self._restore_geometry = (w, h, x, y)
+        self._restore_size = (w, h)
 
         for component in self._components:
             component.hide()
@@ -161,8 +161,10 @@ class MonitorApp:
     def _restore_from_strip(self) -> None:
         for component in self._components:
             component.show()
-        if self._restore_geometry is not None:
-            w, h, x, y = self._restore_geometry
+        if self._restore_size is not None:
+            w, h = self._restore_size
+            x = self._window.root.winfo_x()
+            y = self._window.root.winfo_y()
             self._window.root.geometry(f"{w}x{h}+{x}+{y}")
         self._minimized = False
 
