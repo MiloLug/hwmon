@@ -52,6 +52,14 @@ class BaseComponent(ABC):
     def pack(self, **kwargs) -> None:
         """Pack the component frame."""
         self._frame.pack(**kwargs)
+
+    def hide(self) -> None:
+        """Hide the component frame."""
+        self._frame.pack_forget()
+
+    def show(self) -> None:
+        """Show the component frame using the default packing."""
+        self._frame.pack(fill="x")
     
     def get_widgets(self) -> list[tk.Widget]:
         """Return all widgets for event binding."""

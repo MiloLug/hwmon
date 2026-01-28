@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tkinter as tk
 from dataclasses import replace
 
 from hwmon.components import (
@@ -8,7 +9,7 @@ from hwmon.components import (
 )
 from hwmon.network import NetworkBackend
 from hwmon.sensors import SensorBackend
-from hwmon.window import OverlayWindow
+from hwmon.window import OverlayWindow, SnapTarget
 
 
 class MonitorApp:
@@ -65,6 +66,17 @@ class MonitorApp:
         self._window.install_context_menu()
         self._window.root.bind("<<WindowSnapChanged>>", self._on_snap_changed)
 
+        self._minimized = False
+        self._restore_geometry: tuple[int, int, int, int] | None = None
+        self._bar_visible = False
+        self._bar = tk.Frame(container, bg="#2b2b2b", height=8)
+        self._bar.pack_forget()
+        self._window.bind_drag(self._bar)
+        self._bar.bind("<ButtonRelease-1>", self._on_bar_release)
+        self._window.container.bind(
+            "<ButtonRelease-1>", self._on_container_release, add="+"
+        )
+
     def _exit(self) -> None:
         """Clean up and exit the application."""
         self._exiting = True
@@ -73,9 +85,17 @@ class MonitorApp:
         self._window.root.quit()
 
     def _on_snap_changed(self, _event) -> None:
-        """Placeholder for UI reactions to snap changes."""
-        _ = self._window.snap_target
-        print(f"Snap target changed to: {self._window.snap_target}")
+        is_top = self._window.snap_target in {
+            SnapTarget.TOP,
+            SnapTarget.TOPLEFT,
+            SnapTarget.TOPRIGHT,
+        }
+        if is_top:
+            self._show_bar()
+        else:
+            if self._minimized:
+                self._restore_from_strip()
+            self._hide_bar()
 
     def start(self) -> None:
         """Start the monitoring loop."""
@@ -105,6 +125,56 @@ class MonitorApp:
         
         for component in self._components:
             component.update()
+
+    def _on_bar_release(self, _event) -> None:
+        if self._window.was_click():
+            self._toggle_minimized()
+
+    def _on_container_release(self, _event) -> None:
+        if not self._minimized:
+            return
+        if self._window.was_click():
+            self._restore_from_strip()
+
+    def _toggle_minimized(self) -> None:
+        if self._minimized:
+            self._restore_from_strip()
+        else:
+            self._minimize_to_strip()
+
+    def _minimize_to_strip(self) -> None:
+        self._window.root.update_idletasks()
+        w = self._window.root.winfo_width()
+        h = self._window.root.winfo_height()
+        x = self._window.root.winfo_x()
+        y = self._window.root.winfo_y()
+        self._restore_geometry = (w, h, x, y)
+
+        for component in self._components:
+            component.hide()
+        self._show_bar()
+        self._window.root.update_idletasks()
+        bar_h = max(self._bar.winfo_reqheight(), self._bar.winfo_height(), 1)
+        self._window.root.geometry(f"{w}x{bar_h}+{x}+{y}")
+        self._minimized = True
+
+    def _restore_from_strip(self) -> None:
+        for component in self._components:
+            component.show()
+        if self._restore_geometry is not None:
+            w, h, x, y = self._restore_geometry
+            self._window.root.geometry(f"{w}x{h}+{x}+{y}")
+        self._minimized = False
+
+    def _show_bar(self) -> None:
+        if not self._bar_visible:
+            self._bar.pack(side="bottom", fill="x")
+            self._bar_visible = True
+
+    def _hide_bar(self) -> None:
+        if self._bar_visible:
+            self._bar.pack_forget()
+            self._bar_visible = False
 
 
 def main() -> None:

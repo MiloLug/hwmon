@@ -4,21 +4,23 @@ import ctypes
 import ctypes.wintypes as wintypes
 import tkinter as tk
 from dataclasses import dataclass
-from typing import Callable, Literal, NamedTuple, cast
+from enum import StrEnum
+from typing import Callable, NamedTuple
 
 
 SNAP_PX = 16
-SnapTarget = Literal[
-    "none",
-    "left",
-    "right",
-    "top",
-    "bottom",
-    "topleft",
-    "topright",
-    "bottomleft",
-    "bottomright",
-]
+
+
+class SnapTarget(StrEnum):
+    NONE = "none"
+    LEFT = "left"
+    RIGHT = "right"
+    TOP = "top"
+    BOTTOM = "bottom"
+    TOPLEFT = "topleft"
+    TOPRIGHT = "topright"
+    BOTTOMLEFT = "bottomleft"
+    BOTTOMRIGHT = "bottomright"
 
 
 class RECT(ctypes.Structure):
@@ -104,9 +106,11 @@ class OverlayWindow:
 
         self._drag_off_x = 0
         self._drag_off_y = 0
+        self._drag_start_x = 0
+        self._drag_start_y = 0
         self._monitors: list[Monitor] = []
-        self._snap_target: SnapTarget = "none"
-        self._last_released_snap_target: SnapTarget = "none"
+        self._snap_target = SnapTarget.NONE
+        self._last_released_snap_target = SnapTarget.NONE
         self._exit_callback: Callable[[], None] | None = None
         self._menu: tk.Menu | None = None
 
@@ -141,6 +145,8 @@ class OverlayWindow:
         """Record starting position for drag."""
         self._drag_off_x = event.x_root - self.root.winfo_x()
         self._drag_off_y = event.y_root - self.root.winfo_y()
+        self._drag_start_x = self.root.winfo_x()
+        self._drag_start_y = self.root.winfo_y()
         self._refresh_monitor_cache()
 
     def _on_drag(self, event: tk.Event) -> None:
@@ -155,14 +161,14 @@ class OverlayWindow:
             x, y, target = self._apply_snap(x, y, w, h, monitor.work_rect)
             self._snap_target = target
         else:
-            self._snap_target = "none"
+            self._snap_target = SnapTarget.NONE
 
         self.root.geometry(f"+{x}+{y}")
 
     def _on_release(self, event: tk.Event) -> None:
         monitor = self._pick_monitor(event.x_root, event.y_root)
         if monitor is None:
-            target = "none"
+            target = SnapTarget.NONE
         else:
             w = self.root.winfo_width()
             h = self.root.winfo_height()
@@ -241,34 +247,48 @@ class OverlayWindow:
         dt = abs(y - top)
         db = abs((y + h) - bottom)
 
-        snap_x: str | None = None
-        snap_y: str | None = None
+        snap_x: SnapTarget | None = None
+        snap_y: SnapTarget | None = None
 
         if dl <= SNAP_PX and dl <= dr:
             x = left
-            snap_x = "left"
+            snap_x = SnapTarget.LEFT
         elif dr <= SNAP_PX:
             x = right - w
-            snap_x = "right"
+            snap_x = SnapTarget.RIGHT
 
         if dt <= SNAP_PX and dt <= db:
             y = top
-            snap_y = "top"
+            snap_y = SnapTarget.TOP
         elif db <= SNAP_PX:
             y = bottom - h
-            snap_y = "bottom"
+            snap_y = SnapTarget.BOTTOM
 
         if snap_x and snap_y:
-            target = f"{snap_y}{snap_x}"
+            if snap_y == SnapTarget.TOP and snap_x == SnapTarget.LEFT:
+                target = SnapTarget.TOPLEFT
+            elif snap_y == SnapTarget.TOP and snap_x == SnapTarget.RIGHT:
+                target = SnapTarget.TOPRIGHT
+            elif snap_y == SnapTarget.BOTTOM and snap_x == SnapTarget.LEFT:
+                target = SnapTarget.BOTTOMLEFT
+            else:
+                target = SnapTarget.BOTTOMRIGHT
         elif snap_x:
             target = snap_x
         elif snap_y:
             target = snap_y
         else:
-            target = "none"
+            target = SnapTarget.NONE
 
-        return x, y, cast(SnapTarget, target)
+        return x, y, target
 
     @property
     def snap_target(self) -> SnapTarget:
         return self._snap_target
+
+    def was_click(self, threshold: int = 3) -> bool:
+        """Return True if the last drag moved less than threshold pixels."""
+        return (
+            abs(self.root.winfo_x() - self._drag_start_x) < threshold
+            and abs(self.root.winfo_y() - self._drag_start_y) < threshold
+        )
