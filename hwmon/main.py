@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-import tkinter as tk
 from dataclasses import replace
 
 from hwmon.components import (
@@ -9,6 +8,7 @@ from hwmon.components import (
 )
 from hwmon.network import NetworkBackend
 from hwmon.sensors import SensorBackend
+from hwmon.window import OverlayWindow
 
 
 class MonitorApp:
@@ -27,23 +27,16 @@ class MonitorApp:
         self._network_backend = NetworkBackend()
         self._refresh_ms = refresh_ms
 
-        self._root = tk.Tk()
-        self._root.title("HW Monitor")
-        self._root.overrideredirect(True)
-        self._root.attributes("-topmost", True)
-        
-        self._drag_x = 0
-        self._drag_y = 0
+        self._window = OverlayWindow(
+            title="HW Monitor",
+            style=OverlayWindow.Style(
+                bg_color=self.BG_COLOR,
+                border_color=self.BORDER_COLOR,
+            ),
+        )
         self._after_id: str | None = None
         self._exiting = False
-
-        container = tk.Frame(
-            self._root,
-            bg=self.BG_COLOR,
-            highlightbackground=self.BORDER_COLOR,
-            highlightthickness=1,
-        )
-        container.pack(fill="both", expand=True)
+        container = self._window.container
 
         # Create components with shared style base
         graph_style = LoadTempGraphComponent.Style(
@@ -63,57 +56,29 @@ class MonitorApp:
             component.pack(fill="x")
         
         # Bind drag events
-        self._bind_drag_events(self._root)
-        self._bind_drag_events(container)
+        widgets = [self._window.root, container]
         for component in self._components:
-            for widget in component.get_widgets():
-                self._bind_drag_events(widget)
-        
-        self._create_context_menu()
-    
-    def _bind_drag_events(self, widget: tk.Misc) -> None:
-        """Bind mouse drag events to a widget."""
-        widget.bind("<Button-1>", self._start_drag)
-        widget.bind("<B1-Motion>", self._on_drag)
-    
-    def _start_drag(self, event: tk.Event) -> None:
-        """Record starting position for drag."""
-        self._drag_x = event.x
-        self._drag_y = event.y
-    
-    def _on_drag(self, event: tk.Event) -> None:
-        """Handle window dragging."""
-        x = self._root.winfo_x() + event.x - self._drag_x
-        y = self._root.winfo_y() + event.y - self._drag_y
-        self._root.geometry(f"+{x}+{y}")
-    
-    def _create_context_menu(self) -> None:
-        """Create right-click context menu."""
-        self._menu = tk.Menu(self._root, tearoff=0)
-        self._menu.add_command(
-            label="Exit", 
-            command=lambda: self._root.after(1, self._exit),
-        )
-        def show_menu(event: tk.Event) -> None:
-            self._menu.tk_popup(event.x_root, event.y_root)
-        
-        self._root.bind("<Button-3>", show_menu)
+            widgets.extend(component.get_widgets())
+        self._window.bind_drag_many(widgets)
+
+        self._window.set_exit_callback(self._exit)
+        self._window.install_context_menu()
 
     def _exit(self) -> None:
         """Clean up and exit the application."""
         self._exiting = True
         if self._after_id is not None:
-            self._root.after_cancel(self._after_id)
-        self._root.quit()
+            self._window.root.after_cancel(self._after_id)
+        self._window.root.quit()
 
     def start(self) -> None:
         """Start the monitoring loop."""
         self._schedule_update()
-        self._root.mainloop()
+        self._window.root.mainloop()
 
     def _schedule_update(self) -> None:
         self._update()
-        self._after_id = self._root.after(self._refresh_ms, self._schedule_update)
+        self._after_id = self._window.root.after(self._refresh_ms, self._schedule_update)
 
     def _update(self) -> None:
         metrics = self._sensors.sample()
