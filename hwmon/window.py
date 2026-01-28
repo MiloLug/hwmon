@@ -4,10 +4,21 @@ import ctypes
 import ctypes.wintypes as wintypes
 import tkinter as tk
 from dataclasses import dataclass
-from typing import Callable, NamedTuple
+from typing import Callable, Literal, NamedTuple, cast
 
 
 SNAP_PX = 16
+SnapTarget = Literal[
+    "none",
+    "left",
+    "right",
+    "top",
+    "bottom",
+    "topleft",
+    "topright",
+    "bottomleft",
+    "bottomright",
+]
 
 
 class RECT(ctypes.Structure):
@@ -94,6 +105,8 @@ class OverlayWindow:
         self._drag_off_x = 0
         self._drag_off_y = 0
         self._monitors: list[Monitor] = []
+        self._snap_target: SnapTarget = "none"
+        self._last_released_snap_target: SnapTarget = "none"
         self._exit_callback: Callable[[], None] | None = None
         self._menu: tk.Menu | None = None
 
@@ -101,6 +114,7 @@ class OverlayWindow:
         """Bind mouse drag events to a widget."""
         widget.bind("<Button-1>", self._start_drag)
         widget.bind("<B1-Motion>", self._on_drag)
+        widget.bind("<ButtonRelease-1>", self._on_release)
 
     def bind_drag_many(self, widgets: list[tk.Misc]) -> None:
         """Bind mouse drag events to multiple widgets."""
@@ -138,23 +152,28 @@ class OverlayWindow:
 
         monitor = self._pick_monitor(event.x_root, event.y_root)
         if monitor is not None:
-            left, top, right, bottom = monitor.work_rect
-            dl = abs(x - left)
-            dr = abs((x + w) - right)
-            dt = abs(y - top)
-            db = abs((y + h) - bottom)
-
-            if dl <= SNAP_PX and dl <= dr:
-                x = left
-            elif dr <= SNAP_PX:
-                x = right - w
-
-            if dt <= SNAP_PX and dt <= db:
-                y = top
-            elif db <= SNAP_PX:
-                y = bottom - h
+            x, y, target = self._apply_snap(x, y, w, h, monitor.work_rect)
+            self._snap_target = target
+        else:
+            self._snap_target = "none"
 
         self.root.geometry(f"+{x}+{y}")
+
+    def _on_release(self, event: tk.Event) -> None:
+        monitor = self._pick_monitor(event.x_root, event.y_root)
+        if monitor is None:
+            target = "none"
+        else:
+            w = self.root.winfo_width()
+            h = self.root.winfo_height()
+            x = self.root.winfo_x()
+            y = self.root.winfo_y()
+            _, _, target = self._apply_snap(x, y, w, h, monitor.work_rect)
+
+        self._snap_target = target
+        if target != self._last_released_snap_target:
+            self._last_released_snap_target = target
+            self.root.event_generate("<<WindowSnapChanged>>")
 
     def _on_exit_menu(self) -> None:
         if self._exit_callback is not None:
@@ -207,3 +226,49 @@ class OverlayWindow:
                 best = monitor
                 best_dist = dist
         return best
+
+    def _apply_snap(
+        self,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        work_rect: tuple[int, int, int, int],
+    ) -> tuple[int, int, SnapTarget]:
+        left, top, right, bottom = work_rect
+        dl = abs(x - left)
+        dr = abs((x + w) - right)
+        dt = abs(y - top)
+        db = abs((y + h) - bottom)
+
+        snap_x: str | None = None
+        snap_y: str | None = None
+
+        if dl <= SNAP_PX and dl <= dr:
+            x = left
+            snap_x = "left"
+        elif dr <= SNAP_PX:
+            x = right - w
+            snap_x = "right"
+
+        if dt <= SNAP_PX and dt <= db:
+            y = top
+            snap_y = "top"
+        elif db <= SNAP_PX:
+            y = bottom - h
+            snap_y = "bottom"
+
+        if snap_x and snap_y:
+            target = f"{snap_y}{snap_x}"
+        elif snap_x:
+            target = snap_x
+        elif snap_y:
+            target = snap_y
+        else:
+            target = "none"
+
+        return x, y, cast(SnapTarget, target)
+
+    @property
+    def snap_target(self) -> SnapTarget:
+        return self._snap_target

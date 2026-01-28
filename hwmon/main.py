@@ -63,6 +63,7 @@ class MonitorApp:
 
         self._window.set_exit_callback(self._exit)
         self._window.install_context_menu()
+        self._window.root.bind("<<WindowSnapChanged>>", self._on_snap_changed)
 
     def _exit(self) -> None:
         """Clean up and exit the application."""
@@ -70,6 +71,11 @@ class MonitorApp:
         if self._after_id is not None:
             self._window.root.after_cancel(self._after_id)
         self._window.root.quit()
+
+    def _on_snap_changed(self, _event) -> None:
+        """Placeholder for UI reactions to snap changes."""
+        _ = self._window.snap_target
+        print(f"Snap target changed to: {self._window.snap_target}")
 
     def start(self) -> None:
         """Start the monitoring loop."""
