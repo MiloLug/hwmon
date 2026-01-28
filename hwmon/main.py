@@ -9,6 +9,7 @@ from hwmon.components import (
 )
 from hwmon.network import NetworkBackend
 from hwmon.sensors import SensorBackend
+from hwmon.window import OverlayWindow, SnapTarget
 
 
 class MonitorApp:
@@ -27,23 +28,16 @@ class MonitorApp:
         self._network_backend = NetworkBackend()
         self._refresh_ms = refresh_ms
 
-        self._root = tk.Tk()
-        self._root.title("HW Monitor")
-        self._root.overrideredirect(True)
-        self._root.attributes("-topmost", True)
-        
-        self._drag_x = 0
-        self._drag_y = 0
+        self._window = OverlayWindow(
+            title="HW Monitor",
+            style=OverlayWindow.Style(
+                bg_color=self.BG_COLOR,
+                border_color=self.BORDER_COLOR,
+            ),
+        )
         self._after_id: str | None = None
         self._exiting = False
-
-        container = tk.Frame(
-            self._root,
-            bg=self.BG_COLOR,
-            highlightbackground=self.BORDER_COLOR,
-            highlightthickness=1,
-        )
-        container.pack(fill="both", expand=True)
+        container = self._window.container
 
         # Create components with shared style base
         graph_style = LoadTempGraphComponent.Style(
@@ -63,57 +57,54 @@ class MonitorApp:
             component.pack(fill="x")
         
         # Bind drag events
-        self._bind_drag_events(self._root)
-        self._bind_drag_events(container)
+        widgets = [self._window.root, container]
         for component in self._components:
-            for widget in component.get_widgets():
-                self._bind_drag_events(widget)
-        
-        self._create_context_menu()
-    
-    def _bind_drag_events(self, widget: tk.Misc) -> None:
-        """Bind mouse drag events to a widget."""
-        widget.bind("<Button-1>", self._start_drag)
-        widget.bind("<B1-Motion>", self._on_drag)
-    
-    def _start_drag(self, event: tk.Event) -> None:
-        """Record starting position for drag."""
-        self._drag_x = event.x
-        self._drag_y = event.y
-    
-    def _on_drag(self, event: tk.Event) -> None:
-        """Handle window dragging."""
-        x = self._root.winfo_x() + event.x - self._drag_x
-        y = self._root.winfo_y() + event.y - self._drag_y
-        self._root.geometry(f"+{x}+{y}")
-    
-    def _create_context_menu(self) -> None:
-        """Create right-click context menu."""
-        self._menu = tk.Menu(self._root, tearoff=0)
-        self._menu.add_command(
-            label="Exit", 
-            command=lambda: self._root.after(1, self._exit),
+            widgets.extend(component.get_widgets())
+        self._window.bind_drag_many(widgets)
+
+        self._window.set_exit_callback(self._exit)
+        self._window.install_context_menu()
+        self._window.root.bind("<<WindowSnapChanged>>", self._on_snap_changed)
+
+        self._minimized = False
+        self._restore_size: tuple[int, int] | None = None
+        self._bar_visible = False
+        self._bar = tk.Frame(container, bg="#2b2b2b", height=8)
+        self._bar.pack_forget()
+        self._window.bind_drag(self._bar)
+        self._bar.bind("<ButtonRelease-1>", self._on_bar_release)
+        self._window.container.bind(
+            "<ButtonRelease-1>", self._on_container_release, add="+"
         )
-        def show_menu(event: tk.Event) -> None:
-            self._menu.tk_popup(event.x_root, event.y_root)
-        
-        self._root.bind("<Button-3>", show_menu)
 
     def _exit(self) -> None:
         """Clean up and exit the application."""
         self._exiting = True
         if self._after_id is not None:
-            self._root.after_cancel(self._after_id)
-        self._root.quit()
+            self._window.root.after_cancel(self._after_id)
+        self._window.root.quit()
+
+    def _on_snap_changed(self, _event) -> None:
+        is_top = self._window.snap_target in {
+            SnapTarget.TOP,
+            SnapTarget.TOPLEFT,
+            SnapTarget.TOPRIGHT,
+        }
+        if is_top:
+            self._show_bar()
+        else:
+            if self._minimized:
+                self._restore_from_strip()
+            self._hide_bar()
 
     def start(self) -> None:
         """Start the monitoring loop."""
         self._schedule_update()
-        self._root.mainloop()
+        self._window.root.mainloop()
 
     def _schedule_update(self) -> None:
         self._update()
-        self._after_id = self._root.after(self._refresh_ms, self._schedule_update)
+        self._after_id = self._window.root.after(self._refresh_ms, self._schedule_update)
 
     def _update(self) -> None:
         metrics = self._sensors.sample()
@@ -134,6 +125,58 @@ class MonitorApp:
         
         for component in self._components:
             component.update()
+
+    def _on_bar_release(self, _event) -> None:
+        if self._window.was_click():
+            self._toggle_minimized()
+
+    def _on_container_release(self, _event) -> None:
+        if not self._minimized:
+            return
+        if self._window.was_click():
+            self._restore_from_strip()
+
+    def _toggle_minimized(self) -> None:
+        if self._minimized:
+            self._restore_from_strip()
+        else:
+            self._minimize_to_strip()
+
+    def _minimize_to_strip(self) -> None:
+        self._window.root.update_idletasks()
+        w = self._window.root.winfo_width()
+        h = self._window.root.winfo_height()
+        x = self._window.root.winfo_x()
+        y = self._window.root.winfo_y()
+        self._restore_size = (w, h)
+
+        for component in self._components:
+            component.hide()
+        self._show_bar()
+        self._window.root.update_idletasks()
+        bar_h = max(self._bar.winfo_reqheight(), self._bar.winfo_height(), 1)
+        self._window.root.geometry(f"{w}x{bar_h}+{x}+{y}")
+        self._minimized = True
+
+    def _restore_from_strip(self) -> None:
+        for component in self._components:
+            component.show()
+        if self._restore_size is not None:
+            w, h = self._restore_size
+            x = self._window.root.winfo_x()
+            y = self._window.root.winfo_y()
+            self._window.root.geometry(f"{w}x{h}+{x}+{y}")
+        self._minimized = False
+
+    def _show_bar(self) -> None:
+        if not self._bar_visible:
+            self._bar.pack(side="bottom", fill="x")
+            self._bar_visible = True
+
+    def _hide_bar(self) -> None:
+        if self._bar_visible:
+            self._bar.pack_forget()
+            self._bar_visible = False
 
 
 def main() -> None:
