@@ -139,7 +139,6 @@ class OverlayWindow:
                 self._menu.tk_popup(event.x_root, event.y_root)
 
         self.root.bind("<Button-3>", show_menu)
-        self.container.bind("<Button-3>", show_menu)
 
     def _start_drag(self, event: tk.Event) -> None:
         """Record starting position for drag."""
