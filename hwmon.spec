@@ -14,7 +14,7 @@ excludes = [
     'unittest', 'pytest', 'doctest', 'pdb', 'profile', 'cProfile',
     # Unused stdlib
     'sqlite3', 'asyncio', 'concurrent', 'multiprocessing',
-    'logging', 'argparse', 'getopt', 'optparse',
+    'argparse', 'getopt', 'optparse',
     'pydoc', 'tarfile', 'gzip',
     'csv', 'configparser', 'json',  # if not using these
     'decimal', 'fractions', 'statistics',
