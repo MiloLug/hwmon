@@ -8,8 +8,8 @@ from hwmon.components import (
     CPUComponent,
     GPUComponent,
     LoadTempGraphComponent,
-    # NetworkComponent,
-    TimeComponent,
+    NetworkComponent,
+    # TimeComponent,
 )
 from hwmon.network import NetworkBackend
 from hwmon.sensors import SensorBackend
@@ -50,12 +50,13 @@ class MonitorApp:
             temp_threshold=80.0,
         )
         
-        self._time = TimeComponent(container, TimeComponent.Style(width=self.WIDTH, bg_color="#2a2a2a", font=("Segoe UI", 10)))
+        #self._time = TimeComponent(container, TimeComponent.Style(width=self.WIDTH, bg_color="#2a2a2a", font=("Segoe UI", 10)))
         self._cpu = CPUComponent(container, replace(graph_style, graph_color="#4a9eff"))
         self._gpu = GPUComponent(container, replace(graph_style, graph_color="#4aff9e"))
-        #self._network = NetworkComponent(container, NetworkComponent.Style(width=self.WIDTH, sample_window=update_measures))
+        self._network = NetworkComponent(container, NetworkComponent.Style(width=self.WIDTH, sample_window=update_measures))
         
-        self._components: list[BaseComponent] = [self._cpu, self._gpu, self._time]
+        #self._components: list[BaseComponent] = [self._cpu, self._gpu, self._time]
+        self._components: list[BaseComponent] = [self._cpu, self._gpu, self._network]
         
         # Pack components
         for component in self._components:
@@ -73,7 +74,8 @@ class MonitorApp:
 
         self._minimized = False
         self._restore_size: tuple[int, int] | None = None
-        for widget in self._time.get_widgets():
+        #for widget in self._time.get_widgets():
+        for widget in self._network.get_widgets():
             widget.bind("<ButtonRelease-1>", self._on_time_release, add="+")
         self._window.container.bind(
             "<ButtonRelease-1>", self._on_container_release, add="+"
@@ -106,7 +108,7 @@ class MonitorApp:
 
     def _update(self) -> None:
         metrics = self._sensors.sample()
-        # net_metrics = self._network_backend.sample()
+        net_metrics = self._network_backend.sample()
         
         self._cpu.add_sample(
             temp=metrics.get("cpu_temp"),
@@ -116,10 +118,10 @@ class MonitorApp:
             temp=metrics.get("gpu_temp"),
             usage=metrics.get("gpu_usage")
         )
-        # self._network.add_sample(
-        #     net_in=net_metrics.get("net_in"),
-        #     net_out=net_metrics.get("net_out")
-        # )
+        self._network.add_sample(
+            net_in=net_metrics.get("net_in"),
+            net_out=net_metrics.get("net_out")
+        )
         
         for component in self._components:
             component.update()
@@ -155,14 +157,17 @@ class MonitorApp:
         self._restore_size = (w, h)
 
         for component in self._components:
-            if component is self._time:
+            #if component is self._time:
+            if component is self._network:
                 component.show()
             else:
                 component.hide()
         self._window.root.update_idletasks()
-        time_frame = self._time.get_widgets()[0]
-        time_h = max(time_frame.winfo_reqheight(), time_frame.winfo_height(), 1)
-        self._window.root.geometry(f"{w}x{time_h}+{x}+{y}")
+        #time_frame = self._time.get_widgets()[0]
+        network_frame = self._network.get_widgets()[0]
+        #time_h = max(time_frame.winfo_reqheight(), time_frame.winfo_height(), 1)
+        network_h = max(network_frame.winfo_reqheight(), network_frame.winfo_height(), 1)
+        self._window.root.geometry(f"{w}x{network_h}+{x}+{y}")
         self._minimized = True
 
     def _restore_from_strip(self) -> None:
